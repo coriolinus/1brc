@@ -3,6 +3,14 @@ name = "one-billion-rows"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+anyhow = { version = "1.0.79", optional = true }
+rand = { version = "0.8.5", optional = true }
+rand_distr = { version = "0.4.3", optional = true }
+
+[features]
+generator = ["anyhow", "rand", "rand_distr"]
+
+[[bin]]
+name = "generate"
+required-features = ["generator"]
