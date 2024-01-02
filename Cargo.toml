@@ -2,6 +2,7 @@
 name = "one-billion-rows"
 version = "0.1.0"
 edition = "2021"
+default-run = "1brc"
 
 [dependencies]
 anyhow = { version = "1.0.79", optional = true }
@@ -14,3 +15,7 @@ generator = ["anyhow", "rand", "rand_distr"]
 [[bin]]
 name = "generate"
 required-features = ["generator"]
+
+[[bin]]
+name = "1brc"
+path = "src/main.rs"
