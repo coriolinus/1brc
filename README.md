@@ -13,3 +13,15 @@ There is a feature-gated binary which can create the appropriate measurements li
 ```sh
 time cargo run --release --features generator --bin generate 1000000000
 ```
+
+## Run the challenge
+
+```sh
+$ cargo build --release && time target/release/1brc >/dev/null
+   Compiling one-billion-rows v0.1.0 (1brc)
+    Finished release [optimized] target(s) in 0.62s
+
+real    0m9.737s
+user    1m15.772s
+sys     0m1.607s
+```
