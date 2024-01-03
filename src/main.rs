@@ -9,7 +9,7 @@ use std::{
 };
 
 /// Size of chunk that each thread will process at a time
-const CHUNK_SIZE: u64 = 4 * 1024 * 1024;
+const CHUNK_SIZE: u64 = 16 * 1024 * 1024;
 /// How much extra space we back the chunk start up by, to ensure we capture the full initial record
 ///
 /// Must be greater than the longest line in the table
@@ -67,7 +67,7 @@ type BorrowedMap<'a> = std::collections::HashMap<&'a [u8], Records>;
 /// "Aligned" in this case means that the first byte of the returned buffer is the
 /// first byte of a record, and if `offset != 0` then the previous byte of the source file is `\n`,
 /// and the final byte of the returned buffer is `\n`.
-fn get_aligned_buffer(file: &File, offset: u64) -> Result<Vec<u8>> {
+fn get_aligned_buffer<'a>(file: &File, offset: u64, mut buffer: &'a mut [u8]) -> Result<&'a [u8]> {
     assert!(
         offset == 0 || offset > CHUNK_EXCESS,
         "offset must never be less than chunk excess"
@@ -75,53 +75,56 @@ fn get_aligned_buffer(file: &File, offset: u64) -> Result<Vec<u8>> {
     let metadata = file.metadata()?;
     let file_size = metadata.size();
     if offset > file_size {
-        return Ok(Vec::new());
+        return Ok(&[]);
     }
 
-    let mut buffer_size;
-    let mut excess_head;
+    let buffer_size = buffer.len().min((file_size - offset) as usize);
+    buffer = &mut buffer[..buffer_size];
+
+    let mut head;
     let read_from;
 
     if offset == 0 {
-        buffer_size = CHUNK_SIZE;
-        excess_head = 0;
+        head = 0;
         read_from = 0;
     } else {
-        buffer_size = CHUNK_SIZE + CHUNK_EXCESS;
-        excess_head = CHUNK_EXCESS;
+        head = CHUNK_EXCESS;
         read_from = offset - CHUNK_EXCESS;
     };
-    buffer_size = buffer_size.min(file_size - offset);
-    let mut buffer = vec![0; buffer_size as usize];
 
-    file.read_exact_at(&mut buffer, read_from)?;
+    file.read_exact_at(buffer, read_from)?;
 
     // step backwards until we find the end of the previous record
     // then drop all elements before that
-    while excess_head > 0 {
-        if buffer[(excess_head - 1) as usize] == b'\n' {
+    while head > 0 {
+        if buffer[(head - 1) as usize] == b'\n' {
             break;
         }
-        excess_head -= 1;
+        head -= 1;
     }
-
-    buffer.drain(..(excess_head as usize));
 
     // find the end of the final valid record
-    let mut final_byte_idx = buffer.len() - 1;
-    while buffer[final_byte_idx] != b'\n' {
-        final_byte_idx -= 1;
+    let mut tail = buffer.len() - 1;
+    while buffer[tail] != b'\n' {
+        tail -= 1;
     }
-    buffer.truncate(final_byte_idx);
 
-    Ok(buffer)
+    Ok(&buffer[head as usize..=tail])
 }
 
-fn process_chunk(file: &File, offset: u64, outer_map: &mut Arc<Mutex<Map>>) -> Result<()> {
-    let aligned_buffer = get_aligned_buffer(file, offset)?;
+fn process_chunk(
+    file: &File,
+    offset: u64,
+    outer_map: &mut Arc<Mutex<Map>>,
+    buffer: &mut [u8],
+) -> Result<()> {
+    let aligned_buffer = get_aligned_buffer(file, offset, buffer)?;
     let mut map = BorrowedMap::new();
 
-    for line in aligned_buffer.split(|&b| b == b'\n') {
+    for line in aligned_buffer
+        .split(|&b| b == b'\n')
+        .filter(|line| !line.is_empty())
+    {
         let split_point = line
             .iter()
             .enumerate()
@@ -170,14 +173,17 @@ fn distribute_work(file: &File) -> Result<Map> {
         for _ in 0..thread::available_parallelism().map(Into::into).unwrap_or(1) {
             let offset = offset.clone();
             let mut map = map.clone();
-            scope.spawn(move || loop {
-                let offset = offset.fetch_add(CHUNK_SIZE, Ordering::SeqCst);
-                if offset > file_size {
-                    break;
-                }
+            scope.spawn(move || {
+                let mut buffer = vec![0; (CHUNK_SIZE + CHUNK_EXCESS) as usize];
+                loop {
+                    let offset = offset.fetch_add(CHUNK_SIZE, Ordering::SeqCst);
+                    if offset > file_size {
+                        break;
+                    }
 
-                process_chunk(file, offset, &mut map)
-                    .expect("processing a chunk should always succeed");
+                    process_chunk(file, offset, &mut map, &mut buffer)
+                        .expect("processing a chunk should always succeed");
+                }
             });
         }
     });
