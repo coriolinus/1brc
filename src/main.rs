@@ -88,7 +88,7 @@ fn get_aligned_buffer<'a>(file: &File, offset: u64, mut buffer: &'a mut [u8]) ->
         head = 0;
         read_from = 0;
     } else {
-        head = CHUNK_EXCESS;
+        head = CHUNK_EXCESS as usize;
         read_from = offset - CHUNK_EXCESS;
     };
 
@@ -97,7 +97,7 @@ fn get_aligned_buffer<'a>(file: &File, offset: u64, mut buffer: &'a mut [u8]) ->
     // step backwards until we find the end of the previous record
     // then drop all elements before that
     while head > 0 {
-        if buffer[(head - 1) as usize] == b'\n' {
+        if buffer[head - 1] == b'\n' {
             break;
         }
         head -= 1;
@@ -109,7 +109,7 @@ fn get_aligned_buffer<'a>(file: &File, offset: u64, mut buffer: &'a mut [u8]) ->
         tail -= 1;
     }
 
-    Ok(&buffer[head as usize..=tail])
+    Ok(&buffer[head..=tail])
 }
 
 fn process_chunk(
