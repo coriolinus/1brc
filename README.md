@@ -25,3 +25,9 @@ real    0m9.737s
 user    1m15.772s
 sys     0m1.607s
 ```
+
+## Optional Features
+
+While the text of the challenge instructs us to use only the standard library, it's fun trying to eke out some extra performance by adding some dependencies.
+
+- `fxhash`: replaces the hash algorithm with a non-cryptographically-safe one which might be quicker

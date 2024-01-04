@@ -57,10 +57,25 @@ impl Records {
     }
 }
 
-type Map = std::collections::HashMap<String, Records>;
+#[cfg(not(feature = "fxhash"))]
+type HashState = std::collections::hash_map::RandomState;
+
+#[cfg(feature = "fxhash")]
+type HashState = fxhash::FxBuildHasher;
+
+type GenericMap<K, V> = std::collections::HashMap<K, V, HashState>;
+
+type Map = GenericMap<String, Records>;
 // note that we defer parsing the slice into a string until as late as possible, which hopefully
 // minimizes access time
-type BorrowedMap<'a> = std::collections::HashMap<&'a [u8], Records>;
+type BorrowedMap<'a> = GenericMap<&'a [u8], Records>;
+
+macro_rules! new_map {
+    ($t:ty) => {{
+        let hasher = HashState::default();
+        <$t>::with_hasher(hasher)
+    }};
+}
 
 /// Get an aligned buffer from the given file.
 ///
@@ -119,7 +134,7 @@ fn process_chunk(
     buffer: &mut [u8],
 ) -> Result<()> {
     let aligned_buffer = get_aligned_buffer(file, offset, buffer)?;
-    let mut map = BorrowedMap::new();
+    let mut map = new_map!(BorrowedMap);
 
     for line in aligned_buffer
         .split(|&b| b == b'\n')
@@ -167,7 +182,7 @@ fn distribute_work(file: &File) -> Result<Map> {
     let file_size = metadata.size();
 
     let offset = Arc::new(AtomicU64::new(0));
-    let map = Arc::new(Mutex::new(Map::new()));
+    let map = Arc::new(Mutex::new(new_map!(Map)));
 
     thread::scope(|scope| {
         for _ in 0..thread::available_parallelism().map(Into::into).unwrap_or(1) {
