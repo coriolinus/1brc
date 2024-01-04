@@ -1,22 +1,6 @@
-[package]
-name = "one-billion-rows"
-version = "0.1.0"
-edition = "2021"
-default-run = "1brc"
-
-[dependencies]
-anyhow = { version = "1.0.79", optional = true }
-fxhash = { version = "0.2.1", optional = true }
-rand = { version = "0.8.5", optional = true }
-rand_distr = { version = "0.4.3", optional = true }
-
-[features]
-generator = ["anyhow", "rand", "rand_distr"]
-
-[[bin]]
-name = "generate"
-required-features = ["generator"]
-
-[[bin]]
-name = "1brc"
-path = "src/main.rs"
+[workspace]
+resolver = "2"
+members = [
+  "generator",
+  "solutions/reference",
+]
