@@ -58,12 +58,12 @@ impl Records {
 }
 
 #[cfg(not(feature = "fxhash"))]
-type HashState = std::collections::hash_map::RandomState;
+type Hasher = std::collections::hash_map::RandomState;
 
 #[cfg(feature = "fxhash")]
-type HashState = fxhash::FxBuildHasher;
+type Hasher = fxhash::FxBuildHasher;
 
-type GenericMap<K, V> = std::collections::HashMap<K, V, HashState>;
+type GenericMap<K, V> = std::collections::HashMap<K, V, Hasher>;
 
 type Map = GenericMap<String, Records>;
 // note that we defer parsing the slice into a string until as late as possible, which hopefully
@@ -72,7 +72,7 @@ type BorrowedMap<'a> = GenericMap<&'a [u8], Records>;
 
 macro_rules! new_map {
     ($t:ty) => {{
-        let hasher = HashState::default();
+        let hasher = Hasher::default();
         <$t>::with_hasher(hasher)
     }};
 }

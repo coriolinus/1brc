@@ -30,4 +30,4 @@ sys     0m1.607s
 
 While the text of the challenge instructs us to use only the standard library, it's fun trying to eke out some extra performance by adding some dependencies.
 
-- `fxhash`: replaces the hash algorithm with a non-cryptographically-safe one which might be quicker
+- `fxhash`: replaces the hash algorithm with a non-cryptographically-safe one which is approximately 1.2x quicker
